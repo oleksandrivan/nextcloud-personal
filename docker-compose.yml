@@ -1,0 +1,63 @@
+services:
+  mariadb:
+    image: mariadb:10.6
+    container_name: mariadb
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - MYSQL_RANDOM_ROOT_PASSWORD=true
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=example_pw
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    volumes:
+      - /home/elucri/nextcloud/db:/var/lib/mysql
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - /home/elucri/nextcloud/redis:/data
+    restart: unless-stopped
+
+  nextcloud:
+    image: nextcloud
+    container_name: nextcloud
+    depends_on:
+      - mariadb
+      - redis
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - REDIS_HOST=redis
+      - MYSQL_HOST=mariadb
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_PASSWORD=example_pw
+    volumes:
+      - /home/elucri/nextcloud/app/html:/var/www/html
+      - /home/elucri/nextcloud/app/custom_apps:/var/www/html/custom_apps
+      - /home/elucri/nextcloud/app/config:/var/www/html/config
+      - /home/elucri/nextcloud/app/data:/var/www/html/data 
+    ports:
+      - 52006:80
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN}
+    restart: unless-stopped
+    env_file:
+      - .env
